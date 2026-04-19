@@ -11,6 +11,17 @@ python -m venv [name]
 ```
 Replace [name] with the name of the environment
 
+## Activiating venv
+# Windows
+```bash
+[name]/Scripts/activate
+```
+
+# WSL (linux)
+```bash
+source [name]/bin/activate
+```
+
 ## Libraries
 ```bash
 pip install cvzone
