@@ -1,3 +1,4 @@
+from cmu_graphics import *
 from cvzone.HandTrackingModule import HandDetector
 import cv2
 import pygame
