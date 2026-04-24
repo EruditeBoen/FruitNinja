@@ -243,6 +243,7 @@ while running:
                     slice.play()
                     value['hit'] = True
                     value['img'] = pygame.image.load(sliced_fruit)
+                    score += 1
 
             if len(hands) == 2:
                 hand2 = hands[1]
@@ -267,6 +268,7 @@ while running:
                         slice.play()
                         value['hit'] = True
                         value['img'] = pygame.image.load(sliced_fruit)
+                        score += 1
                     
         else:
             if not value['hit'] and intersect((value['x'], value['y']), (mouse_pos[0], mouse_pos[1])):
