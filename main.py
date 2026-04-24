@@ -85,6 +85,10 @@ data = {}
 for fruit in fruits:
     generate_fruits(fruit)
     
+sliced_imgs = {}
+for fruit in fruits:
+    sliced_imgs[fruit] = pygame.image.load("images/sliced_" + fruit + ".png")
+    
 # claude generated this draw_text function
 def draw_text(display, text, size, x, y):
     text_surface = font.render(text, True, ORANGE)
@@ -119,13 +123,33 @@ def timer():
     timer_rect.topleft = (WIDTH // 2, 10)
     gameDisplay.blit(timer_text, timer_rect)
     
-def intersect(fruitpos, fingerpos):
+def intersect(fruitpos, fingerpos, fruit_img):
     fruit_x, fruit_y = fruitpos
     finger_x, finger_y = fingerpos
+    w, h = fruit_img.get_size()
 
-    if (finger_x > fruit_x and finger_x < fruit_x+100) and (finger_y > fruit_y and finger_y < fruit_y+100):
+    if (finger_x > fruit_x and finger_x < fruit_x + w) and (finger_y > fruit_y and finger_y < fruit_y + h):
         return True
     return False
+
+def handle_hit(x1, y1):
+    global bomb_timer, lives, score
+    if not value['hit'] and intersect((value['x'], value['y']), (x1, y1), value['img']):
+                
+        if key == 'bomb':
+            bomb_timer = pygame.time.get_ticks()
+            value['hit'] = True
+            bomb.play()
+            bad_piggies.set_volume(0)
+
+            lives -= 1
+
+        else:
+            slice.play()
+            value['hit'] = True
+            value['img'] = sliced_imgs[key]
+            score += 1
+    
 
 state = 'start'
 running = True
@@ -133,7 +157,7 @@ final_score = 0
 
 while running:
 
-    dt = clock.tick(FPS) / 1200
+    dt = clock.tick(FPS) / 1000
     
 
     for event in pygame.event.get():
@@ -207,7 +231,7 @@ while running:
             value['sy'] += 400 * dt
             # ----------------------------------
 
-            if value['y'] <= 800:
+            if value['y'] <= HEIGHT + 50:
                 gameDisplay.blit(value['img'], (value['x'], value['y']))
             else:
                 generate_fruits(key)
@@ -228,22 +252,7 @@ while running:
 
             pygame.draw.circle(gameDisplay, (255, 255, 255), index1, 5)
             
-            if not value['hit'] and intersect((value['x'], value['y']), (x1, y1)):
-                
-                if key == 'bomb':
-                    bomb_timer = pygame.time.get_ticks()
-                    value['hit'] = True
-                    bomb.play()
-                    bad_piggies.set_volume(0)
-
-                    lives -= 1
-
-                else:
-                    sliced_fruit = "images/" + "sliced_" + key + ".png"
-                    slice.play()
-                    value['hit'] = True
-                    value['img'] = pygame.image.load(sliced_fruit)
-                    score += 1
+            handle_hit(x1, y1)
 
             if len(hands) == 2:
                 hand2 = hands[1]
@@ -254,38 +263,10 @@ while running:
 
                 pygame.draw.circle(gameDisplay, (255, 255, 255), index2, 5)
 
-                if not value['hit'] and intersect((value['x'], value['y']), (x2, y2)):
-                    
-                    if key == 'bomb':
-                        bomb_timer = pygame.time.get_ticks()
-                        bomb.play()
-                        bad_piggies.set_volume(0)
-                        value['hit'] = True
-
-                        lives -= 1
-                    else:
-                        sliced_fruit = "images/" + "sliced_" + key + ".png"
-                        slice.play()
-                        value['hit'] = True
-                        value['img'] = pygame.image.load(sliced_fruit)
-                        score += 1
+                handle_hit(x2, y2)
                     
         else:
-            if not value['hit'] and intersect((value['x'], value['y']), (mouse_pos[0], mouse_pos[1])):
-                
-                if key == 'bomb':
-                    bomb_timer = pygame.time.get_ticks()
-                    bomb.play()
-                    bad_piggies.set_volume(0)
-                    value['hit'] = True
-                    lives -= 1
-
-                else:
-                    sliced_fruit = "images/" + "sliced_" + key + ".png"
-                    slice.play()
-                    value['hit'] = True
-                    value['img'] = pygame.image.load(sliced_fruit)
-                    score += 1
+            handle_hit(mouse_pos[0], mouse_pos[1])
 
     # claude generated these 11 lines
     if bomb_timer > 0:
