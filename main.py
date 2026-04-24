@@ -16,13 +16,17 @@ detector = HandDetector(staticMode=False, maxHands=2, modelComplexity=1, detecti
 lives = 3
 score = 0
 fruits = ['dragonfruit', 'pineapple', 'plum', 'watermelon', 'pomegranate', 'strawberry', 'bomb']
-round_duration = 60
 time_ = 0
 fruit_rate = 0.2
 bomb_rate = 0.1
 bomb_timer = 0
 
-BOMB_DISPLAY_DURATION = 2500
+game_duration = 60
+current_time = 0
+
+BOMB_HOLD_DURATION = 2000
+BOMB_FADE_DURATION = 2000
+BOMB_DISPLAY_DURATION = BOMB_HOLD_DURATION + BOMB_FADE_DURATION
 
 WIDTH = 1200
 HEIGHT = 800
@@ -33,8 +37,27 @@ pygame.display.set_caption('Fruit-Ninja With a Twist!')
 gameDisplay = pygame.display.set_mode((WIDTH, HEIGHT))
 clock = pygame.time.Clock()
 
-background = pygame.image.load('data/start_screen.png')
+background = pygame.image.load('data/background.png')
+start = pygame.image.load('data/start_screen.png')
+gameover = pygame.image.load('data/gameover.jpg')
+
 kaboom = pygame.image.load('images/kaboom.png')
+lives_img = pygame.image.load('images/lives.png')
+
+bomb = pygame.mixer.Sound("sounds/bomb.mp3")
+slice = pygame.mixer.Sound("sounds/slice.wav")
+fart = pygame.mixer.Sound("sounds/fart.mp3")
+
+ambatukam = pygame.mixer.Sound("sounds/ambatukam.mp3")
+bad_piggies = pygame.mixer.Sound("sounds/bad_piggies.mp3")
+outro = pygame.mixer.Sound("sounds/outro.mp3")
+
+font = pygame.font.Font("data/font.ttf", 42)
+
+ORANGE = (247, 190, 0)
+WHITE = (255, 255, 255)
+
+ambatukam.play(loops=100)
 
 def generate_fruits(fruit):
     path = "images/" + fruit + ".png"
@@ -62,35 +85,39 @@ data = {}
 for fruit in fruits:
     generate_fruits(fruit)
     
+# claude generated this draw_text function
 def draw_text(display, text, size, x, y):
-    pass
+    text_surface = font.render(text, True, ORANGE)
+    text_rect = text_surface.get_rect()
+    text_rect.midtop = (x, y)
+    gameDisplay.blit(text_surface, text_rect)
+# ----------------------------------------
 
 def draw_lives(display, x, y, lives, image):
     for i in range(lives):
-        img = pygame.image.load(image)
-        img_rect = img.get_rect()
+        img_rect = image.get_rect()
         img_rect.x = int(x + 35 * i)
         img_rect.y = y
-        display.blit(img, img_rect)
+        display.blit(image, img_rect)
 
-def start_screen():
-    gameDisplay.blit(background, (0, 0))
-    pygame.display.update()
-
-    screen = False
-    while not screen:
-        
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                pygame.quit()
-            if event.type == pygame.MOUSEBUTTONDOWN:
-                return pygame.image.load('data/background.png')
+def reset():
+    # gemeni generated this one line
+    global lives, score, fruit_rate, bomb_rate, bomb_timer
+    # ------------------------------
+    lives = 3
+    score = 0
+    fruit_rate = 0.2
+    bomb_rate = 0.1
+    bomb_timer = 0
+    for fruit in fruits:
+        generate_fruits(fruit)
                 
-def gameover():
-    pass
-
 def timer():
-    pass
+    time_left = max(0, game_duration - current_timer)
+    timer_text = font.render(str(time_left), True, WHITE)
+    timer_rect = timer_text.get_rect()
+    timer_rect.topleft = (WIDTH // 2, 10)
+    gameDisplay.blit(timer_text, timer_rect)
     
 def intersect(fruitpos, fingerpos):
     fruit_x, fruit_y = fruitpos
@@ -100,37 +127,54 @@ def intersect(fruitpos, fingerpos):
         return True
     return False
 
-first_round = True
-game_over = True
+state = 'start'
 running = True
-game_duration = 60
-current_time = 0
+final_score = 0
 
 while running:
 
     dt = clock.tick(FPS) / 1200
     
-    if game_over:
-
-        if first_round:
-            background = start_screen()
-            gameover()
-            first_round = False
-
-        game_over = False
-        player_lives = 3
-        score = 0
-        fruit_rate = 0.2
-        bomb_rate = 0.1
-        # draw_lives(gameDisplay, 690, 5, player_lives, 'images/lives.png')
-        start_time = pygame.time.get_ticks()
-        
-    current_time = (pygame.time.get_ticks() - start_time) // 1000
-        
 
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             running = False
+
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if state == 'start':
+                reset()
+                state = 'playing'
+                ambatukam.stop()
+                bad_piggies.play(loops=100)
+                bad_piggies.set_volume(0.3)
+                start_time = pygame.time.get_ticks()
+            elif state == 'gameover':
+                state = 'start'
+                ambatukam.play(loops=100)
+                outro.stop()
+
+    if state == 'start':
+        gameDisplay.blit(start, (0, 0))
+        pygame.display.update()
+        clock.tick(FPS)
+        continue
+
+    if state == 'gameover':
+        gameDisplay.blit(gameover, (-150, 0))
+        final_score_txt = font.render(str(final_score), True, ORANGE)
+        gameDisplay.blit(final_score_txt, (15, 0))
+        pygame.display.update()
+        clock.tick(FPS)
+        continue
+    
+    current_timer = (pygame.time.get_ticks() - start_time) // 1000
+
+    if current_timer >= game_duration:
+        final_score = score
+        fart.play()
+        outro.play(fade_ms=1000, loops=100)
+        bad_piggies.stop()
+        state = 'gameover'
 
     _, img = cap.read()
 
@@ -149,7 +193,11 @@ while running:
     # ----------------------------------
 
     gameDisplay.blit(background, (0, 0))
+    score_txt = font.render(str(score), True, ORANGE)
+    gameDisplay.blit(score_txt, (15, 0))
+    draw_lives(gameDisplay, WIDTH-150, 5, lives, lives_img)
 
+    timer()
     
     for key, value in data.items():
         if value['throw']:
@@ -183,12 +231,18 @@ while running:
             if not value['hit'] and intersect((value['x'], value['y']), (x1, y1)):
                 
                 if key == 'bomb':
-                    sliced_fruit = "images/" + "sliced_" + key + ".png"
+                    bomb_timer = pygame.time.get_ticks()
+                    value['hit'] = True
+                    bomb.play()
+                    bad_piggies.set_volume(0)
+
+                    lives -= 1
 
                 else:
                     sliced_fruit = "images/" + "sliced_" + key + ".png"
-                    
-                value['img'] = pygame.image.load(sliced_fruit)
+                    slice.play()
+                    value['hit'] = True
+                    value['img'] = pygame.image.load(sliced_fruit)
 
             if len(hands) == 2:
                 hand2 = hands[1]
@@ -202,27 +256,36 @@ while running:
                 if not value['hit'] and intersect((value['x'], value['y']), (x2, y2)):
                     
                     if key == 'bomb':
-                        sliced_fruit = "images/" + "sliced_" + key + ".png"
+                        bomb_timer = pygame.time.get_ticks()
+                        bomb.play()
+                        bad_piggies.set_volume(0)
+                        value['hit'] = True
+
+                        lives -= 1
                     else:
                         sliced_fruit = "images/" + "sliced_" + key + ".png"
-                        
-                    value['img'] = pygame.image.load(sliced_fruit)
+                        slice.play()
+                        value['hit'] = True
+                        value['img'] = pygame.image.load(sliced_fruit)
                     
         else:
             if not value['hit'] and intersect((value['x'], value['y']), (mouse_pos[0], mouse_pos[1])):
                 
                 if key == 'bomb':
-                    # sliced_fruit = "images/" + "sliced_" + key + ".png"
                     bomb_timer = pygame.time.get_ticks()
+                    bomb.play()
+                    bad_piggies.set_volume(0)
                     value['hit'] = True
+                    lives -= 1
+
                 else:
                     sliced_fruit = "images/" + "sliced_" + key + ".png"
-
+                    slice.play()
+                    value['hit'] = True
                     value['img'] = pygame.image.load(sliced_fruit)
+                    score += 1
 
-    BOMB_HOLD_DURATION = 900
-    BOMB_FADE_DURATION = 800
-
+    # claude generated these 11 lines
     if bomb_timer > 0:
         elapsed = pygame.time.get_ticks() - bomb_timer
 
@@ -230,13 +293,23 @@ while running:
             alpha = 255
         else:
             fade_elapsed = elapsed - BOMB_HOLD_DURATION
-            alpha = max(0, 255-int((elapsed / BOMB_DISPLAY_DURATION) * 155))
+            alpha = max(0, 255-int((fade_elapsed / BOMB_DISPLAY_DURATION) * 255))
 
         kaboom.set_alpha(alpha)
-        gameDisplay.blit(kaboom, (0, 0))
+        gameDisplay.blit(kaboom, (-150, 0))
 
         if elapsed > BOMB_DISPLAY_DURATION:
             bomb_timer = 0
+    # -------------------------------
+            if lives <= 0:
+                final_score = score
+                fart.play()
+                outro.play(fade_ms=1000, loops=100)
+                bad_piggies.stop()
+                state = 'gameover'
+            else:
+                bad_piggies.set_volume(0.3)
+                
 
 
     cv2.waitKey(1)
